@@ -43,6 +43,50 @@ def partition_by_date(df, asof):
 
     return hot, warm, cold
 
+# -----------------------------
+# Tiered transformations
+# -----------------------------
+def process_hot(df: pd.DataFrame, out_path: Path):
+    df = deduplicate(df)
+    df.to_parquet(out_path, index=False, compression="snappy")  # fast compression
+    print(f"🔥 Hot tier written → {out_path}")
+
+def process_warm(df: pd.DataFrame, out_path: Path):
+    df = deduplicate(df)
+
+    # Keep only useful columns (hard-coded)
+    keep_cols = [
+        "Region", "Country", "Item Type", "Order Date",
+        "Ship Date", "Order ID", "Units Sold", "Unit Price",
+        "Unit Cost", "Total Revenue", "Total Cost", "Total Profit"
+    ]
+    df = df[[c for c in keep_cols if c in df.columns]]
+
+    # Summarize low-priority numeric fields
+    if "Unit Price" in df: df["Unit Price"] = df["Unit Price"].round(0)
+    if "Unit Cost" in df: df["Unit Cost"] = df["Unit Cost"].round(0)
+
+    df.to_parquet(out_path, index=False, compression="gzip")  # smaller size
+    print(f"🌡️ Warm tier written → {out_path}")
+
+def process_cold(df: pd.DataFrame, out_path: Path):
+    df = deduplicate(df)
+
+    # Keep only legally required / high-value cols
+    keep_cols = ["Order Date", "Order ID", "Total Revenue", "Total Profit"]
+    df = df[[c for c in keep_cols if c in df.columns]]
+
+    # Aggregate yearly totals
+    df["Year"] = pd.to_datetime(df["Order Date"]).dt.year
+    agg = df.groupby("Year").agg(
+        Orders=("Order ID", "count"),
+        Revenue=("Total Revenue", "sum"),
+        Profit=("Total Profit", "sum"),
+    ).reset_index()
+
+    agg.to_parquet(out_path, index=False, compression="zstd")  # max compression
+    print(f"❄️ Cold tier written → {out_path}")
+
 
 # ---------------------------
 # Retention (compress / keep subset)
