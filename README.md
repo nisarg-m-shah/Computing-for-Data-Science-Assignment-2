@@ -1,4 +1,4 @@
-# Managing the Data Deluge: A Tiered Approach to Space-Efficient Data Lifecycle Management
+# CIA 2 Assignment: Controlling Unbounded Data Growth
 
 This repository contains the implementation and research documentation for a temporal data tiering system that achieves 97.5% storage reduction through progressive optimization strategies.
 
